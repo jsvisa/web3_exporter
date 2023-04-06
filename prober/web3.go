@@ -62,6 +62,11 @@ type StarknetResponse struct {
 	} `json:"result"`
 }
 
+type AptosResponse struct {
+	Number    math.HexOrDecimal64 `json:"block_height"`
+	Timestamp math.HexOrDecimal64 `json:"ledger_timestamp"`
+}
+
 func ProbeWeb3(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) (success bool) {
 	var redirects int
 	var (
@@ -392,6 +397,15 @@ func ProbeWeb3(ctx context.Context, target string, module config.Module, registr
 				} else {
 					blockNumber = uint64(block.Result.Number)
 					blockTimestamp = uint64(block.Result.Timestamp)
+				}
+			} else if web3Config.IsAptos {
+				var block AptosResponse
+				if err := json.Unmarshal(resp.Bytes(), &block); err != nil {
+					level.Info(logger).Log("msg", "Failed to unmarshal aptos block", "err", err)
+					success = false
+				} else {
+					blockNumber = uint64(block.Number)
+					blockTimestamp = uint64(block.Timestamp) / 1e6
 				}
 			}
 

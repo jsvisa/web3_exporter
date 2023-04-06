@@ -227,6 +227,7 @@ type HTTPProbe struct {
 }
 
 type Web3Probe struct {
+	// FIXME: can't inline HTTPProbe
 	ValidStatusCodes             []int                   `yaml:"valid_status_codes,omitempty"`
 	ValidHTTPVersions            []string                `yaml:"valid_http_versions,omitempty"`
 	IPProtocol                   string                  `yaml:"preferred_ip_protocol,omitempty"`
@@ -249,6 +250,7 @@ type Web3Probe struct {
 
 	IsEthereum bool `yaml:"is_ethereum,omitempty"`
 	IsStarknet bool `yaml:"is_starknet,omitempty"`
+	IsAptos    bool `yaml:"is_aptos,omitempty"`
 }
 
 type GRPCProbe struct {
