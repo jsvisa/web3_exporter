@@ -63,6 +63,7 @@ var (
 		IPProtocolFallback: true,
 		HTTPClientConfig:   config.DefaultHTTPClientConfig,
 	}
+	DefaultWeb3Probe = Web3Probe{}
 
 	// DefaultGRPCProbe set default value for HTTPProbe
 	DefaultGRPCProbe = GRPCProbe{
@@ -199,6 +200,7 @@ type Module struct {
 	ICMP    ICMPProbe     `yaml:"icmp,omitempty"`
 	DNS     DNSProbe      `yaml:"dns,omitempty"`
 	GRPC    GRPCProbe     `yaml:"grpc,omitempty"`
+	Web3    Web3Probe     `yaml:"web3,omitempty"`
 }
 
 type HTTPProbe struct {
@@ -222,6 +224,31 @@ type HTTPProbe struct {
 	HTTPClientConfig             config.HTTPClientConfig `yaml:"http_client_config,inline"`
 	Compression                  string                  `yaml:"compression,omitempty"`
 	BodySizeLimit                units.Base2Bytes        `yaml:"body_size_limit,omitempty"`
+}
+
+type Web3Probe struct {
+	ValidStatusCodes             []int                   `yaml:"valid_status_codes,omitempty"`
+	ValidHTTPVersions            []string                `yaml:"valid_http_versions,omitempty"`
+	IPProtocol                   string                  `yaml:"preferred_ip_protocol,omitempty"`
+	IPProtocolFallback           bool                    `yaml:"ip_protocol_fallback,omitempty"`
+	SkipResolvePhaseWithProxy    bool                    `yaml:"skip_resolve_phase_with_proxy,omitempty"`
+	NoFollowRedirects            *bool                   `yaml:"no_follow_redirects,omitempty"`
+	FailIfSSL                    bool                    `yaml:"fail_if_ssl,omitempty"`
+	FailIfNotSSL                 bool                    `yaml:"fail_if_not_ssl,omitempty"`
+	Method                       string                  `yaml:"method,omitempty"`
+	Headers                      map[string]string       `yaml:"headers,omitempty"`
+	FailIfBodyMatchesRegexp      []Regexp                `yaml:"fail_if_body_matches_regexp,omitempty"`
+	FailIfBodyNotMatchesRegexp   []Regexp                `yaml:"fail_if_body_not_matches_regexp,omitempty"`
+	FailIfHeaderMatchesRegexp    []HeaderMatch           `yaml:"fail_if_header_matches,omitempty"`
+	FailIfHeaderNotMatchesRegexp []HeaderMatch           `yaml:"fail_if_header_not_matches,omitempty"`
+	Body                         string                  `yaml:"body,omitempty"`
+	BodyFile                     string                  `yaml:"body_file,omitempty"`
+	HTTPClientConfig             config.HTTPClientConfig `yaml:"http_client_config,inline"`
+	Compression                  string                  `yaml:"compression,omitempty"`
+	BodySizeLimit                units.Base2Bytes        `yaml:"body_size_limit,omitempty"`
+
+	IsEthereum bool `yaml:"is_ethereum,omitempty"`
+	IsStarknet bool `yaml:"is_starknet,omitempty"`
 }
 
 type GRPCProbe struct {
@@ -309,6 +336,48 @@ func (s *Module) UnmarshalYAML(unmarshal func(interface{}) error) error {
 func (s *HTTPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*s = DefaultHTTPProbe
 	type plain HTTPProbe
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
+	}
+
+	// BodySizeLimit == 0 means no limit. By leaving it at 0 we
+	// avoid setting up the limiter.
+	if s.BodySizeLimit < 0 || s.BodySizeLimit == math.MaxInt64 {
+		// The implementation behind http.MaxBytesReader tries
+		// to add 1 to the specified limit causing it to wrap
+		// around and become negative, and then it tries to use
+		// that result to index an slice.
+		s.BodySizeLimit = math.MaxInt64 - 1
+	}
+
+	if err := s.HTTPClientConfig.Validate(); err != nil {
+		return err
+	}
+
+	if s.NoFollowRedirects != nil {
+		s.HTTPClientConfig.FollowRedirects = !*s.NoFollowRedirects
+	}
+
+	if s.Body != "" && s.BodyFile != "" {
+		return errors.New("setting body and body_file both are not allowed")
+	}
+
+	for key, value := range s.Headers {
+		switch textproto.CanonicalMIMEHeaderKey(key) {
+		case "Accept-Encoding":
+			if !isCompressionAcceptEncodingValid(s.Compression, value) {
+				return fmt.Errorf(`invalid configuration "%s: %s", "compression: %s"`, key, value, s.Compression)
+			}
+		}
+	}
+
+	return nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *Web3Probe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*s = DefaultWeb3Probe
+	type plain Web3Probe
 	if err := unmarshal((*plain)(s)); err != nil {
 		return err
 	}

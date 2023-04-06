@@ -39,6 +39,7 @@ var (
 		"icmp": ProbeICMP,
 		"dns":  ProbeDNS,
 		"grpc": ProbeGRPC,
+		"web3": ProbeWeb3,
 	}
 	moduleUnknownCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "blackbox_module_unknown_total",
