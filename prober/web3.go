@@ -43,7 +43,7 @@ import (
 
 const (
 	EthereumRequest = `{ "jsonrpc":"2.0", "method":"eth_getBlockByNumber", "params":["latest", false], "id":74 }`
-	StarknetRequest = `{ "jsonrpc":"2.0", "method":"starknet_getBlockWithTxs", "params": {"block_id": "latest"}, "id":73 }`
+	StarknetRequest = `{ "jsonrpc":"2.0", "method":"starknet_getBlockWithTxHashes", "params": {"block_id": "latest"}, "id":73 }`
 )
 
 type EthereumResponse struct {
