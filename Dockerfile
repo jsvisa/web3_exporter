@@ -1,12 +1,19 @@
-ARG ARCH="amd64"
-ARG OS="linux"
-FROM quay.io/prometheus/busybox-${OS}-${ARCH}:latest
-LABEL maintainer="The Prometheus Authors <prometheus-developers@googlegroups.com>"
+# Build in a stock Go builder container
+FROM golang:1.20-alpine as builder
 
-ARG ARCH="amd64"
-ARG OS="linux"
-COPY .build/${OS}-${ARCH}/blackbox_exporter  /bin/blackbox_exporter
-COPY blackbox.yml       /etc/blackbox_exporter/config.yml
+# Get dependencies - will also be cached if we won't change go.mod/go.sum
+COPY go.mod /app/
+COPY go.sum /app/
+RUN cd /app && go mod download
+
+ADD . /app
+RUN cd /app && go build -o blackbox_exporter
+
+# Pull binary into a second stage deploy alpine container
+FROM alpine:latest
+
+COPY --from=builder /app/blackbox_exporter /bin/
+COPY blackbox.yml   /etc/blackbox_exporter/config.yml
 
 EXPOSE      9115
 ENTRYPOINT  [ "/bin/blackbox_exporter" ]
